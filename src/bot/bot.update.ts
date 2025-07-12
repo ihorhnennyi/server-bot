@@ -1,5 +1,5 @@
 import { Inject } from '@nestjs/common'
-import { Action, Ctx, Hears, Start, Update } from 'nestjs-telegraf'
+import { Action, Command, Ctx, Hears, Start, Update } from 'nestjs-telegraf'
 import { Context, Markup } from 'telegraf'
 import { SSHService } from '../ssh/ssh.service'
 import { isFreshMessage } from './helpers/is-fresh-message'
@@ -31,6 +31,7 @@ export class BotUpdate {
 					Markup.button.callback('♻️ Перезагрузка', 'reboot'),
 					Markup.button.callback('⏹️ Выключение', 'shutdown'),
 				],
+				[Markup.button.callback('📋 Инфо', 'info')],
 			])
 		)
 	}
@@ -75,6 +76,34 @@ export class BotUpdate {
 			})
 		} catch (error: any) {
 			await this.replyWithError(ctx, 'Ошибка при выключении', error)
+		}
+	}
+
+	@Command('info')
+	@Action('info')
+	async handleInfo(@Ctx() ctx: Context) {
+		await ctx.reply('ℹ️ Получаю информацию о сервере...')
+		try {
+			const output = await this.sshService.executeCommand(
+				`
+echo "🖥️ Hostname: $(hostname)"
+echo "🌐 IP: $(hostname -I | awk '{print $1}')"
+echo "📈 Uptime: $(uptime -p)"
+echo "🧠 CPU cores: $(nproc)"
+echo "💾 Disk usage:"
+df -h /
+echo "🧮 Memory usage:"
+free -h
+			`
+			)
+			await ctx.reply(
+				`📋 *Информация о сервере:*\n\`\`\`\n${output.trim()}\n\`\`\``,
+				{
+					parse_mode: 'Markdown',
+				}
+			)
+		} catch (error: any) {
+			await this.replyWithError(ctx, 'Ошибка при получении информации', error)
 		}
 	}
 

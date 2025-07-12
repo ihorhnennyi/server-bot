@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TelegrafModule } from 'nestjs-telegraf'
+import { SSHModule } from '../ssh/ssh.module'
 import { BotUpdate } from './bot.update'
 
 @Module({
 	imports: [
 		ConfigModule.forRoot(),
+		SSHModule,
 		TelegrafModule.forRootAsync({
 			imports: [ConfigModule],
 			useFactory: async (
@@ -15,7 +17,6 @@ import { BotUpdate } from './bot.update'
 					token: configService.get<string>('BOT_TOKEN')!,
 				}
 			},
-
 			inject: [ConfigService],
 		}),
 	],

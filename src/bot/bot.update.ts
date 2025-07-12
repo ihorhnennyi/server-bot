@@ -29,4 +29,25 @@ export class BotUpdate {
 			})
 		}
 	}
+
+	@Command('reboot')
+	async onReboot(@Ctx() ctx: Context) {
+		await ctx.reply('♻️ Перезагружаю сервер...')
+		try {
+			const output = await this.sshService.executeCommand('sudo reboot')
+			await ctx.reply(
+				`✅ Сервер будет перезагружен.\n\`\`\`\n${output}\n\`\`\``,
+				{
+					parse_mode: 'Markdown',
+				}
+			)
+		} catch (error) {
+			await ctx.reply(
+				`❌ Ошибка при перезагрузке:\n\`\`\`\n${error.message ?? error}\n\`\`\``,
+				{
+					parse_mode: 'Markdown',
+				}
+			)
+		}
+	}
 }

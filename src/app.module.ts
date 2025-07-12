@@ -1,8 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common'
+import { BotModule } from './bot/bot.module'
 
 @Module({
-  imports: [],
-  controllers: [],
-  providers: [],
+	imports: [BotModule],
 })
 export class AppModule {}

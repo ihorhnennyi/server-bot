@@ -2,15 +2,21 @@ import { Inject } from '@nestjs/common'
 import { Action, Command, Ctx, Hears, Start, Update } from 'nestjs-telegraf'
 import { Context, Markup } from 'telegraf'
 import { SSHService } from '../ssh/ssh.service'
+import { UserService } from '../user/user.service'
 import { isFreshMessage } from './helpers/is-fresh-message'
 
 @Update()
 export class BotUpdate {
-	constructor(@Inject(SSHService) private readonly sshService: SSHService) {}
+	constructor(
+		@Inject(SSHService) private readonly sshService: SSHService,
+		private readonly userService: UserService
+	) {}
 
 	@Start()
 	async onStart(@Ctx() ctx: Context) {
 		if (!isFreshMessage(ctx)) return
+		const access = await this.checkAccess(ctx)
+		if (!access) return
 
 		await ctx.reply('Привет! Я бот для управления серверами 💻', {
 			reply_markup: {
@@ -23,6 +29,9 @@ export class BotUpdate {
 
 	@Hears('📋 Меню')
 	async onMenu(@Ctx() ctx: Context) {
+		const access = await this.checkAccess(ctx)
+		if (!access) return
+
 		await ctx.reply(
 			'Выберите действие:',
 			Markup.inlineKeyboard([
@@ -39,6 +48,9 @@ export class BotUpdate {
 	@Action('status')
 	async handleStatus(@Ctx() ctx: Context) {
 		await ctx.answerCbQuery()
+		const access = await this.checkAccess(ctx)
+		if (!access) return
+
 		await ctx.reply('🔄 Получаю статус сервера...')
 		try {
 			const output = await this.sshService.executeCommand('uptime')
@@ -53,6 +65,9 @@ export class BotUpdate {
 	@Action('reboot')
 	async handleReboot(@Ctx() ctx: Context) {
 		await ctx.answerCbQuery()
+		const access = await this.checkAccess(ctx)
+		if (!access) return
+
 		await ctx.reply('♻️ Перезагружаю сервер...')
 		try {
 			const output = await this.sshService.executeCommand('sudo reboot')
@@ -68,6 +83,9 @@ export class BotUpdate {
 	@Action('shutdown')
 	async handleShutdown(@Ctx() ctx: Context) {
 		await ctx.answerCbQuery()
+		const access = await this.checkAccess(ctx)
+		if (!access) return
+
 		await ctx.reply('⏹️ Выключаю сервер...')
 		try {
 			const output = await this.sshService.executeCommand('sudo shutdown now')
@@ -82,6 +100,9 @@ export class BotUpdate {
 	@Command('info')
 	@Action('info')
 	async handleInfo(@Ctx() ctx: Context) {
+		const access = await this.checkAccess(ctx)
+		if (!access) return
+
 		await ctx.reply('ℹ️ Получаю информацию о сервере...')
 		try {
 			const output = await this.sshService.executeCommand(
@@ -94,7 +115,7 @@ echo "💾 Disk usage:"
 df -h /
 echo "🧮 Memory usage:"
 free -h
-			`
+				`
 			)
 			await ctx.reply(
 				`📋 *Информация о сервере:*\n\`\`\`\n${output.trim()}\n\`\`\``,
@@ -112,5 +133,25 @@ free -h
 			`❌ ${message}:\n\`\`\`\n${error?.message ?? error}\n\`\`\``,
 			{ parse_mode: 'Markdown' }
 		)
+	}
+
+	private async checkAccess(ctx: Context): Promise<boolean> {
+		const from = ctx.from
+		if (!from) {
+			await ctx.reply('⛔ Недопустимый пользователь')
+			return false
+		}
+
+		// Сначала создаём (или находим)
+		await this.userService.findOrCreate(from)
+
+		// Потом проверяем, разрешён ли
+		const allowed = await this.userService.isAllowed(from.id)
+		if (!allowed) {
+			await ctx.reply('⛔ У вас нет доступа к этому боту')
+			return false
+		}
+
+		return true
 	}
 }
